@@ -1,0 +1,218 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: app:v1
+          ports:
+            - containerPort: 8080
+          command: ["/bin/bash", "-c", "gunicorn -c conf.py main:app && tail -f /dev/null"]
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+spec:
+  selector:
+    app: app
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image: db:v1
+          ports:
+            - containerPort: 3306
+          restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-service
+spec:
+  selector:
+    app: db
+  ports:
+    - protocol: TCP
+      port: 3308
+      targetPort: 3306
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-master
+  template:
+    metadata:
+      labels:
+        app: redis-master
+    spec:
+      containers:
+        - name: redis-master
+          image: msg:v1
+          ports:
+            - containerPort: 6379
+          command: ["redis-server", "/app/redis-master.conf"]
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-master-service
+spec:
+  selector:
+    app: redis-master
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-replica
+  template:
+    metadata:
+      labels:
+        app: redis-replica
+    spec:
+      containers:
+        - name: redis-replica
+          image: msg:v1
+          ports:
+            - containerPort: 6380
+          command: ["redis-server", "/app/redis-replica.conf"]
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "6380"
+                - ping
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-replica-service
+spec:
+  selector:
+    app: redis-replica
+  ports:
+    - protocol: TCP
+      port: 6380
+      targetPort: 6380
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: task:v1
+          command: ["celery", "-A", "tasks", "worker", "--loglevel=info", "--autoscale=10,3"]
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - /app/healthcheck.sh
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+    spec:
+      containers:
+        - name: flower
+          image: task:v1
+          command: ["celery", "-A", "tasks", "flower", "--port=5555", "--broker=sentinel://192.168.90.192:26379/0"]
+          ports:
+            - containerPort: 5555
+          restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower-service
+spec:
+  selector:
+    app: flower
+  ports:
+    - protocol: TCP
+      port: 5555
+      targetPort: 5555
+  type: ClusterIP

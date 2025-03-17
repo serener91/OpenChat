@@ -1,0 +1,11 @@
+celery
+openai
+redis
+python-dotenv
+flower
+fastapi
+mysql-connector-python
+SQLAlchemy
+mysqlclient
+pymysql
+kombu

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: task:v1
+          command: ["celery", "-A", "tasks", "worker", "--loglevel=info", "--autoscale=10,3"]
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - /app/healthcheck.sh
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          restartPolicy: Always

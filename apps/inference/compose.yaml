@@ -1,0 +1,35 @@
+name: kto
+volumes:
+  kto_setting:
+    external: true
+
+services:
+  engine:
+    image: engine:v
+    container_name: kto-rec
+    ports:
+      - "11280:8080"
+    volumes:
+      - /home/miruware/nas:/weights
+      - kto_setting:/app
+    tty: true
+    shm_size: '1gb'
+    ulimits:
+      memlock:
+        soft: "-1"
+        hard: "-1"
+      stack: "67108864"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 3s
+        max_attempts: 5
+        window: 60s
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['4', '5', '6', '7']
+              capabilities: [ gpu ]
+    entrypoint: ["bash", "-c"]
+    command: ["tail -f /dev/null"]

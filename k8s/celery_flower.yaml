@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+    spec:
+      containers:
+        - name: flower
+          image: task:v1
+          command: ["celery", "-A", "tasks", "flower", "--port=5555", "--broker=sentinel://192.168.90.192:26379/0"]
+          ports:
+            - containerPort: 5555
+          restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower-service
+spec:
+  selector:
+    app: flower
+  ports:
+    - protocol: TCP
+      port: 5555
+      targetPort: 5555
+  type: ClusterIP

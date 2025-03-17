@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-master
+  template:
+    metadata:
+      labels:
+        app: redis-master
+    spec:
+      containers:
+        - name: redis-master
+          image: msg:v1
+          ports:
+            - containerPort: 6379
+          command: ["redis-server", "/app/redis-master.conf"]
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-master-service
+spec:
+  selector:
+    app: redis-master
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP

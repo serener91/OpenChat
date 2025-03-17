@@ -1,0 +1,146 @@
+name: openchat
+volumes:
+  app-logs:
+  broker-master-data:
+  broker-replica-data:
+  task-backend-data:
+  db-data:
+
+services:
+  app:
+    image: app:v1
+    container_name: app
+    volumes:
+      - app-logs:/var/log/gunicorn
+    ports:
+      - "8080:8080"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        gunicorn -c conf.py main:app
+        tail -f /dev/null
+    depends_on:
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
+    restart: on-failure
+
+  db:
+    image: db:v1
+    container_name: db
+    volumes:
+      - db-data:/var/lib/mysql
+    ports:
+      - "3308:3306"
+    restart: always
+
+  backend:
+    image: backend:v1
+    container_name: task-backend
+    volumes:
+      - task-backend-data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    restart: always
+
+  redis-master:
+    image: msg:v1
+    container_name: msg-master
+    volumes:
+      - broker-master-data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server /app/redis-master.conf
+    healthcheck:
+      test: redis-cli ping
+      interval: 3s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  redis-replica:
+    image: msg:v1
+    container_name: msg-replica
+    volumes:
+      - broker-replica-data:/data
+    ports:
+      - "6380:6380"
+    command: redis-server /app/redis-replica.conf
+    healthcheck:
+      test: redis-cli -p 6380 ping
+      interval: 3s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    restart: always
+
+  sentinel-1:
+    image: msg:v1
+    ports:
+      - "26379:26379"
+    command: redis-sentinel /app/sentinel-1.conf
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    restart: always
+
+  sentinel-2:
+    image: msg:v1
+    ports:
+      - "26380:26380"
+    command: redis-sentinel /app/sentinel-2.conf
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    restart: always
+
+  sentinel-3:
+    image: msg:v1
+    ports:
+      - "26381:26381"
+    command: redis-sentinel /app/sentinel-3.conf
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    restart: always
+
+  worker:
+    image: task:v1
+    container_name: worker
+    command: celery -A celery_app worker --loglevel=info --autoscale=10,3
+#    healthcheck:
+#      test: celery -A tasks inspect ping
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 5s
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+      db:
+        condition: service_started
+      backend:
+        condition: service_started
+    restart: always
+
+  flower:
+    image: task:v1
+    container_name: watcher
+    command: celery -A celery_app flower
+    ports:
+      - "5555:5555"
+    depends_on:
+      worker:
+        condition: service_started
+    restart: always
+
