@@ -35,22 +35,7 @@ OpenChat is a modular, containerized backend system designed for chat and infere
 
 ## High-Level Architecture
 
-```mermaid
-flowchart TD
-    A[API Backend (FastAPI)] -->|Requests| B[Task Queue (Celery)]
-    B -->|Tasks| C[LLM Inference (vllm/OpenAI)]
-    A -->|Cache/Rate Limit| D[Redis]
-    B -->|Results| E[MySQL Database]
-    A -->|Monitor| F[Flower]
-    subgraph Containerization
-        A
-        B
-        C
-        D
-        E
-        F
-    end
-```
+![System Flow Diagram](docs/system_flow.png)
 
 ## Getting Started
 
