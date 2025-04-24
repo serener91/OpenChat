@@ -50,3 +50,7 @@ OpenChat is a modular, containerized backend system designed for chat and infere
 - `database/` - Database setup scripts
 - `message_queue/` - Redis/Sentinel configs
 - `common/` - Shared code and requirements
+
+## License
+
+This project is licensed under the [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/).
